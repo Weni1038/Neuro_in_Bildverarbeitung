@@ -1,9 +1,5 @@
-from builtins import range
-from builtins import object
-import numpy as np
-
-from ..layers import *
-from ..layer_utils import *
+from EITB712M.layers import *
+from EITB712M.layer_utils import *
 
 
 class TwoLayerNet(object):
@@ -11,15 +7,7 @@ class TwoLayerNet(object):
     A two-layer fully-connected neural network with ReLU nonlinearity and
     softmax loss that uses a modular layer design. We assume an input dimension
     of D, a hidden dimension of H, and perform classification over C classes.
-
-    The architecure should be affine - relu - affine - softmax.
-
-    Note that this class does not implement gradient descent; instead, it
-    will interact with a separate Solver object that is responsible for running
-    optimization.
-
-    The learnable parameters of the model are stored in the dictionary
-    self.params that maps parameter names to numpy arrays.
+    [...]
     """
 
     def __init__(
@@ -43,9 +31,8 @@ class TwoLayerNet(object):
         """
         self.params = {}
         self.reg = reg
-
         ############################################################################
-        # Initialize the weights and biases of the two-layer net. Weights          #
+        # TODO: Initialize the weights and biases of the two-layer net. Weights    #
         # should be initialized from a Gaussian centered at 0.0 with               #
         # standard deviation equal to weight_scale, and biases should be           #
         # initialized to zero. All weights and biases should be stored in the      #
@@ -53,29 +40,22 @@ class TwoLayerNet(object):
         # and biases using the keys 'W1' and 'b1' and second layer                 #
         # weights and biases using the keys 'W2' and 'b2'.                         #
         ############################################################################
+        # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+
         self.params['W1'] = weight_scale * np.random.randn(input_dim, hidden_dim)
-        self.params['W2'] = weight_scale * np.random.randn(hidden_dim, num_classes)
         self.params['b1'] = np.zeros(hidden_dim)
+        self.params['W2'] = weight_scale * np.random.randn(hidden_dim, num_classes)
         self.params['b2'] = np.zeros(num_classes)
+
+        # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        ############################################################################
+        #                             END OF YOUR CODE                             #
+        ############################################################################
 
     def loss(self, X, y=None):
         """
         Compute loss and gradient for a minibatch of data.
-
-        Inputs:
-        - X: Array of input data of shape (N, d_1, ..., d_k)
-        - y: Array of labels, of shape (N,). y[i] gives the label for X[i].
-
-        Returns:
-        If y is None, then run a test-time forward pass of the model and return:
-        - scores: Array of shape (N, C) giving classification scores, where
-          scores[i, c] is the classification score for X[i] and class c.
-
-        If y is not None, then run a training-time forward and backward pass and
-        return a tuple of:
-        - loss: Scalar value giving the loss
-        - grads: Dictionary with the same keys as self.params, mapping parameter
-          names to gradients of the loss with respect to those parameters.
+        [...]
         """
         scores = None
         ############################################################################
@@ -84,8 +64,15 @@ class TwoLayerNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        z, cache_z = affine_forward(X, W1, b1)
-        scores, cache_score = affine_relu_forward(z, W2, b2)
+        W1 = self.params['W1']
+        b1 = self.params['b1']
+        W2 = self.params['W2']
+        b2 = self.params['b2']
+        reg = self.reg
+
+        # Forward Pass: Affine -> ReLU -> Affine
+        h1, cache1 = affine_relu_forward(X, W1, b1)
+        scores, cache2 = affine_forward(h1, W2, b2)
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -95,30 +82,44 @@ class TwoLayerNet(object):
         # If y is None then we are in test mode so just return scores
         if y is None:
             return scores
-        
-        # Calculate the loss
+
         loss, grads = 0, {}
-        loss, softmax_grad = softmax_loss(scores, y)
-        loss += 0.5 * self.reg * ( np.sum(W1 * W1) + np.sum(W2 * W2) )
-        
         ############################################################################
-        # TODO: Implement the backward pass for the two-layer net.                 #
+        # TODO: Implement the backward pass for the two-layer net. Store the loss  #
+        # in the loss variable and gradients in the grads dictionary. Compute data #
+        # loss using softmax, and make sure that grads[k] holds the gradients      #
+        # for self.params[k]. Don't forget to add L2 regularization!               #
+        #                                                                          #
+        # NOTE: To ensure that your implementation is correct, BATCH NORMALIZATION #
+        # IS NOT USED IN THIS FILE.                                                #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        dz, dw2, db2 = affine_relu_backward(softmax_grad, cache_score)
+        # 1. Loss berechnen (Daten-Loss + Regularisierungs-Loss)
+        data_loss, dscores = softmax_loss(scores, y)
+        reg_loss = 0.5 * reg * (np.sum(W1 * W1) + np.sum(W2 * W2))
+        loss = data_loss + reg_loss
 
-        dx, dw1, db1 = affine_backward(dz, cache_z)
+        # 2. Backward Pass
+        # Zweite Schicht (Affine)
+        dh1, dW2, db2 = affine_backward(dscores, cache2)
+        
+        # Erste Schicht (Affine-ReLU)
+        dX, dW1, db1 = affine_relu_backward(dh1, cache1)
 
+        # 3. Regularisierungs-Gradienten hinzufügen
+        dW1 += reg * W1
+        dW2 += reg * W2
+
+        # Gradienten im Dictionary speichern
+        grads['W1'] = dW1
+        grads['b1'] = db1
+        grads['W2'] = dW2
+        grads['b2'] = db2
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
-        
-        grads['W2'] = dw2 + self.reg * W2
-        grads['b2'] = db2
-        grads['W1'] = dw1 + self.reg * W1
-        grads['b1'] = db1
-        
+
         return loss, grads

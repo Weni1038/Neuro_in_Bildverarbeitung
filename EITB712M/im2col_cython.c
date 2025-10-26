@@ -4,14 +4,14 @@
 {
     "distutils": {
         "depends": [
-            "C:\\Users\\Jax\\Coding\\Neuronale-Netze\\.venv\\Lib\\site-packages\\numpy\\_core\\include\\numpy\\arrayobject.h",
-            "C:\\Users\\Jax\\Coding\\Neuronale-Netze\\.venv\\Lib\\site-packages\\numpy\\_core\\include\\numpy\\arrayscalars.h",
-            "C:\\Users\\Jax\\Coding\\Neuronale-Netze\\.venv\\Lib\\site-packages\\numpy\\_core\\include\\numpy\\ndarrayobject.h",
-            "C:\\Users\\Jax\\Coding\\Neuronale-Netze\\.venv\\Lib\\site-packages\\numpy\\_core\\include\\numpy\\ndarraytypes.h",
-            "C:\\Users\\Jax\\Coding\\Neuronale-Netze\\.venv\\Lib\\site-packages\\numpy\\_core\\include\\numpy\\ufuncobject.h"
+            "C:\\Users\\nicog\\OneDrive\\Desktop\\Arbeit\\Hochschule\\Neuronale-Netze\\.venv\\Lib\\site-packages\\numpy\\_core\\include\\numpy\\arrayobject.h",
+            "C:\\Users\\nicog\\OneDrive\\Desktop\\Arbeit\\Hochschule\\Neuronale-Netze\\.venv\\Lib\\site-packages\\numpy\\_core\\include\\numpy\\arrayscalars.h",
+            "C:\\Users\\nicog\\OneDrive\\Desktop\\Arbeit\\Hochschule\\Neuronale-Netze\\.venv\\Lib\\site-packages\\numpy\\_core\\include\\numpy\\ndarrayobject.h",
+            "C:\\Users\\nicog\\OneDrive\\Desktop\\Arbeit\\Hochschule\\Neuronale-Netze\\.venv\\Lib\\site-packages\\numpy\\_core\\include\\numpy\\ndarraytypes.h",
+            "C:\\Users\\nicog\\OneDrive\\Desktop\\Arbeit\\Hochschule\\Neuronale-Netze\\.venv\\Lib\\site-packages\\numpy\\_core\\include\\numpy\\ufuncobject.h"
         ],
         "include_dirs": [
-            "C:\\Users\\Jax\\Coding\\Neuronale-Netze\\.venv\\Lib\\site-packages\\numpy\\_core\\include"
+            "C:\\Users\\nicog\\OneDrive\\Desktop\\Arbeit\\Hochschule\\Neuronale-Netze\\.venv\\Lib\\site-packages\\numpy\\_core\\include"
         ],
         "name": "im2col_cython",
         "sources": [

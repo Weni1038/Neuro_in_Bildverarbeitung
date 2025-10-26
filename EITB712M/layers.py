@@ -129,39 +129,56 @@ def conv_forward_naive(x, w, b, conv_param):
     - cache: (x, w, b, conv_param)
     """
     out = None
-    # Extract shapes and constants
-    pad = conv_param['pad']
-    stride = conv_param['stride']
-    N, C, H, W = x.shape
-    F, C, FH, FW = w.shape
-
     ###########################################################################
     # TODO: Implement the convolutional forward pass.                         #
-    # Hint: you can use the function np.pad for padding.                      #
+    # Hint: You can use the function np.pad for padding.                      #
     ###########################################################################
+    # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    H_out = 1+ (H +2 * pad - FH) // stride
-    W_out = 1 + (W + 2 * pad - FW) // stride
-    assert (H + 2 * pad - FH) % stride == 0, 'Non-integer H_out'
-    assert (W + 2 * pad - FW) % stride == 0, 'Non-integer W_out'
+    # Parameter und Dimensionen holen
+    P = conv_param['pad']
+    S = conv_param['stride']
+    N, C, H, W = x.shape
+    F, _, HH, WW = w.shape #? Hier stand noch ein C, aber das ist ja schon in x.shape enthalten (C wird aber nicht genutzt)
 
+    # Output-Dimensionen berechnen
+    H_out = 1 + (H + 2 * P - HH) // S
+    W_out = 1 + (W + 2 * P - WW) // S
+
+    # Input mit Nullen padden
+    # np.pad-Format: ((dim0_before, dim0_after), (dim1_before, dim1_after), ...)
+    x_pad = np.pad(x, ((0, 0), (0, 0), (P, P), (P, P)), 'constant')
+
+    # Output-Volumen initialisieren
     out = np.zeros((N, F, H_out, W_out))
 
-    x_pad = np.pad(x, mode="constant", constant_values=0, pad_width=((0,0), (0,0), (pad,pad), (pad,pad)))
-
-    for n in range(N):
-        for f in range(F):
-            for h in range(H_out):
-                for wo in range(W_out):
-                    h_start = h * stride
-                    w_start = wo *stride
-                    x_slice = x_pad[n, :, h_start:h_start+FH, w_start:w_start+FW]
-                    out[n, f, h, wo] = np.sum(x_slice * w[f]) + b[f]
+    # Naive Implementierung mit 4 verschachtelten Schleifen
+    for n in range(N):          # Für jedes Bild im Batch
+        for f in range(F):      # Für jeden Filter
+            for h_out in range(H_out): # Für jede Output-Zeile
+                for w_out in range(W_out): # Für jede Output-Spalte
+                    
+                    # Start-Koordinaten des Patches im gepaddeten Input
+                    h_start = h_out * S
+                    w_start = w_out * S
+                    
+                    # Patch extrahieren (Shape: C, HH, WW)
+                    x_patch = x_pad[n, :, h_start:h_start + HH, w_start:w_start + WW]
+                    
+                    # Filter extrahieren (Shape: C, HH, WW)
+                    filter_w = w[f, :, :, :]
+                    
+                    # Faltung durchführen: Elementweise Multiplikation und Summe
+                    # (C, HH, WW) * (C, HH, WW) -> Summe ergibt Skalar
+                    conv_sum = np.sum(x_patch * filter_w)
+                    
+                    # Bias addieren und im Output speichern
+                    out[n, f, h_out, w_out] = conv_sum + b[f]
 
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
-    cache = (x_pad, w, b, conv_param)
+    cache = (x, w, b, conv_param)
     return out, cache
 
 
@@ -179,37 +196,61 @@ def conv_backward_naive(dout, cache):
     - db: Gradient with respect to b
     """
     dx, dw, db = None, None, None
-    # Extract shapes and constants
-    x_pad, w, b, conv_param = cache
-    N, F, outH, outW = dout.shape
-    N, C, Hpad, Wpad = x_pad.shape
-    HF, WF = w.shape[2], w.shape[3]
     ###########################################################################
     # TODO: Implement the convolutional backward pass.                        #
     ###########################################################################
+    # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pad = conv_param['pad']
-    stride = conv_param['stride']
-    dx_pad = np.zeros_like(x_pad)
+    x, w, b, conv_param = cache
+    P = conv_param['pad']
+    S = conv_param['stride']
+    
+    N, C, H, W = x.shape
+    F, _, HH, WW = w.shape
+    _, _, H_out, W_out = dout.shape
+
+    # Gradienten-Matrizen initialisieren
+    dx = np.zeros_like(x)
     dw = np.zeros_like(w)
     db = np.zeros_like(b)
 
+    # Input padden (für dx- und dw-Berechnung)
+    x_pad = np.pad(x, ((0, 0), (0, 0), (P, P), (P, P)), 'constant')
+    # dx_pad initialisieren (hier sammeln wir die Gradienten)
+    dx_pad = np.zeros_like(x_pad)
+
+    # 1. db berechnen (Shape: F,)
+    # Summiere dout über N, H_out, W_out
     db = np.sum(dout, axis=(0, 2, 3))
 
-    for n in range(N):
-      for f in range(F):
-          for h in range(outH):
-              for wo in range(outW):
-                  h_start = h * stride
-                  w_start = wo *stride
-                  x_slice = x_pad[n, :, h_start:h_start+HF, w_start:w_start+WF]    
+    # 2. & 3. dx und dw berechnen
+    for n in range(N):          # Für jedes Bild
+        for f in range(F):      # Für jeden Filter
+            for h_out in range(H_out): # Für jede Output-Zeile
+                for w_out in range(W_out): # Für jede Output-Spalte
+                    
+                    # Start-Koordinaten
+                    h_start = h_out * S
+                    w_start = w_out * S
+                    
+                    # Upstream-Gradient (Skalar)
+                    d_out_scalar = dout[n, f, h_out, w_out]
+                    
+                    # Patch aus x_pad extrahieren (C, HH, WW)
+                    x_patch = x_pad[n, :, h_start:h_start + HH, w_start:w_start + WW]
+                    
+                    # dw berechnen:
+                    # Gradient für w[f] ist der x_patch * upstream_gradient
+                    dw[f, :, :, :] += x_patch * d_out_scalar
+                    
+                    # dx_pad berechnen:
+                    # Gradient für den x_patch ist w[f] * upstream_gradient
+                    dx_pad[n, :, h_start:h_start + HH, w_start:w_start + WW] += w[f, :, :, :] * d_out_scalar
 
-                  dw[f] += x_slice * dout[n, f, h, wo]
+    # 4. dx aus dx_pad extrahieren (Padding entfernen)
+    dx = dx_pad[:, :, P:P + H, P:P + W]
 
-                  dx_pad[n, :, h_start:h_start+HF, w_start:w_start+WF] += w[f] * dout[n, f, h, wo]
-
-    dx = dx_pad[:, :, pad:-pad, pad:-pad] if pad > 0 else dx_pad
-
+    # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -235,40 +276,44 @@ def max_pool_forward_naive(x, pool_param):
       W' = 1 + (W - pool_width) / stride
     - cache: (x, pool_param)
     """
+
     out = None
-
-    # Extract shapes and constants
-    N, C, H, W = x.shape
-    HF = pool_param.get('pool_height', 2)
-    WF = pool_param.get('pool_width', 2)
-    stride = pool_param.get('stride', 2)
-
     ###########################################################################
     # TODO: Implement the max-pooling forward pass                            #
     ###########################################################################
+    # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    H_out = 1 + (H - HF) // stride
-    W_out = 1 + (W - WF) // stride
-    assert (H - HF) % stride == 0, 'Non-integer H_out'
-    assert (W - WF) % stride == 0, 'Non-integer W_out'
+    N, C, H, W = x.shape
+    PH = pool_param['pool_height']
+    PW = pool_param['pool_width']
+    S = pool_param['stride']
+
+    # Output-Dimensionen
+    H_out = 1 + (H - PH) // S
+    W_out = 1 + (W - PW) // S
 
     out = np.zeros((N, C, H_out, W_out))
 
-    for n in range(N):           # batch
-        for c in range(C):      
-            for h in range(H_out):
-                for wo in range(W_out):
-                    h_start = h * stride
-                    w_start = wo * stride
-                    h_end = h_start + HF
-                    w_end = w_start + WF
+    for n in range(N):
+        for c in range(C):
+            for h_out in range(H_out):
+                for w_out in range(W_out):
+                    
+                    # Start-Koordinaten des Patches
+                    h_start = h_out * S
+                    w_start = w_out * S
+                    
+                    # Patch extrahieren
+                    x_patch = x[n, c, h_start:h_start + PH, w_start:w_start + PW]
+                    
+                    # Max-Wert finden
+                    out[n, c, h_out, w_out] = np.max(x_patch)
 
-                    x_slice = x[n, c, h_start:h_end, w_start:w_end]
-                    out[n, c, h, wo] = np.max(x_slice)
-
+    # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
+
     cache = (x, pool_param)
     return out, cache
 
@@ -285,35 +330,46 @@ def max_pool_backward_naive(dout, cache):
     - dx: Gradient with respect to x
     """
     dx = None
-    # Extract constants and shapes
-    x, pool_param = cache
-    N, C, H, W = x.shape
-    HF = pool_param.get('pool_height', 2)
-    WF = pool_param.get('pool_width', 2)
-    stride = pool_param.get('stride', 2)
     ###########################################################################
     # TODO: Implement the max-pooling backward pass                           #
     ###########################################################################
+    # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    H_out = 1 + (H - HF) // stride
-    W_out = 1 + (W - WF) // stride
+    x, pool_param = cache
+    N, C, H, W = x.shape
+    PH = pool_param['pool_height']
+    PW = pool_param['pool_width']
+    S = pool_param['stride']
+    _, _, H_out, W_out = dout.shape
+
     dx = np.zeros_like(x)
 
-    for n in range(N):           # batch
-        for c in range(C):      
-            for h in range(H_out):
-                for wo in range(W_out):
-                  h_start = h * stride
-                  w_start = wo * stride
-                  h_end = h_start + HF
-                  w_end = w_start + WF
-
-                  x_slice = x[n, c, h_start:h_end, w_start:w_end]
+    for n in range(N):
+        for c in range(C):
+            for h_out in range(H_out):
+                for w_out in range(W_out):
                     
-                  mask = (x_slice == np.max(x_slice))
+                    # Start-Koordinaten
+                    h_start = h_out * S
+                    w_start = w_out * S
+                    
+                    # Upstream-Gradient (Skalar)
+                    d_out_scalar = dout[n, c, h_out, w_out]
+                    
+                    # Patch extrahieren
+                    x_patch = x[n, c, h_start:h_start + PH, w_start:w_start + PW]
+                    
+                    # Den flachen Index des Max-Werts finden
+                    # (z.B. in einem 2x2-Patch ist das ein Index von 0 bis 3)
+                    max_idx_flat = np.argmax(x_patch)
+                    
+                    # Den flachen Index zurück in 2D-Koordinaten (h, w) umwandeln
+                    max_idx_h, max_idx_w = np.unravel_index(max_idx_flat, (PH, PW))
+                    
+                    # Den Gradienten nur an diese eine (maximale) Position im dx-Array addieren
+                    dx[n, c, h_start + max_idx_h, w_start + max_idx_w] += d_out_scalar
 
-                  dx[n, c, h_start:h_end, w_start:w_end] += mask * dout[n, c, h, wo]
-
+    # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
